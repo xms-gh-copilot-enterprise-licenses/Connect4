@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connect4 Tests</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+        .pass {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .fail {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .test-summary {
+            font-weight: bold;
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Connect4 Game Tests</h1>
+    <div id="test-results"></div>
+
+    <script>
+        // Mock DOM elements for testing
+        const mockDocument = {
+            getElementById: (id) => ({
+                innerHTML: '',
+                appendChild: () => {},
+                classList: { add: () => {}, remove: () => {} },
+                textContent: '',
+                className: ''
+            }),
+            createElement: () => ({
+                className: '',
+                dataset: {},
+                addEventListener: () => {},
+                classList: { add: () => {}, remove: () => {} },
+                appendChild: () => {},
+                querySelector: () => null
+            }),
+            addEventListener: () => {},
+            querySelectorAll: () => []
+        };
+
+        // Test framework
+        class TestRunner {
+            constructor() {
+                this.tests = [];
+                this.results = [];
+            }
+
+            test(name, fn) {
+                this.tests.push({ name, fn });
+            }
+
+            async run() {
+                const resultsDiv = document.getElementById('test-results');
+                
+                for (const test of this.tests) {
+                    try {
+                        await test.fn();
+                        this.results.push({ name: test.name, passed: true });
+                        const div = document.createElement('div');
+                        div.className = 'test-result pass';
+                        div.textContent = `✓ ${test.name}`;
+                        resultsDiv.appendChild(div);
+                    } catch (error) {
+                        this.results.push({ name: test.name, passed: false, error: error.message });
+                        const div = document.createElement('div');
+                        div.className = 'test-result fail';
+                        div.textContent = `✗ ${test.name}: ${error.message}`;
+                        resultsDiv.appendChild(div);
+                    }
+                }
+
+                this.showSummary(resultsDiv);
+            }
+
+            showSummary(container) {
+                const passed = this.results.filter(r => r.passed).length;
+                const total = this.results.length;
+                const div = document.createElement('div');
+                div.className = `test-summary ${passed === total ? 'pass' : 'fail'}`;
+                div.textContent = `Tests: ${passed}/${total} passed`;
+                container.appendChild(div);
+            }
+
+            assert(condition, message) {
+                if (!condition) {
+                    throw new Error(message || 'Assertion failed');
+                }
+            }
+
+            assertEqual(actual, expected, message) {
+                if (actual !== expected) {
+                    throw new Error(message || `Expected ${expected}, got ${actual}`);
+                }
+            }
+
+            assertArrayEqual(actual, expected, message) {
+                if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+                    throw new Error(message || `Expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+                }
+            }
+        }
+
+        // Connect4Game class with mocked DOM
+        class Connect4Game {
+            constructor(useMockDOM = false) {
+                this.rows = 6;
+                this.cols = 7;
+                this.board = [];
+                this.currentPlayer = 'red';
+                this.gameOver = false;
+                this.winningCells = [];
+                
+                this.initializeBoard();
+                if (!useMockDOM) {
+                    this.setupEventListeners();
+                    this.renderBoard();
+                }
+            }
+
+            initializeBoard() {
+                this.board = [];
+                for (let row = 0; row < this.rows; row++) {
+                    this.board[row] = [];
+                    for (let col = 0; col < this.cols; col++) {
+                        this.board[row][col] = null;
+                    }
+                }
+            }
+
+            setupEventListeners() {
+                // Mocked for testing
+            }
+
+            renderBoard() {
+                // Mocked for testing
+            }
+
+            dropPiece(col) {
+                if (this.gameOver) return false;
+
+                // Find the lowest available row in this column
+                let targetRow = -1;
+                for (let row = this.rows - 1; row >= 0; row--) {
+                    if (this.board[row][col] === null) {
+                        targetRow = row;
+                        break;
+                    }
+                }
+
+                // Column is full
+                if (targetRow === -1) return false;
+
+                // Update board state
+                this.board[targetRow][col] = this.currentPlayer;
+
+                // Check for win
+                if (this.checkWin(targetRow, col)) {
+                    this.gameOver = true;
+                    return 'win';
+                }
+
+                // Check for tie
+                if (this.checkTie()) {
+                    this.gameOver = true;
+                    return 'tie';
+                }
+
+                // Switch players
+                this.currentPlayer = this.currentPlayer === 'red' ? 'yellow' : 'red';
+                return true;
+            }
+
+            checkWin(row, col) {
+                const player = this.board[row][col];
+                const directions = [
+                    [0, 1],   // horizontal
+                    [1, 0],   // vertical
+                    [1, 1],   // diagonal /
+                    [1, -1]   // diagonal \
+                ];
+
+                for (let [dRow, dCol] of directions) {
+                    const cells = this.getConnectedCells(row, col, dRow, dCol, player);
+                    if (cells.length >= 4) {
+                        this.winningCells = cells;
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            getConnectedCells(row, col, dRow, dCol, player) {
+                const cells = [[row, col]];
+
+                // Check in positive direction
+                let newRow = row + dRow;
+                let newCol = col + dCol;
+                while (this.isValidCell(newRow, newCol) && this.board[newRow][newCol] === player) {
+                    cells.push([newRow, newCol]);
+                    newRow += dRow;
+                    newCol += dCol;
+                }
+
+                // Check in negative direction
+                newRow = row - dRow;
+                newCol = col - dCol;
+                while (this.isValidCell(newRow, newCol) && this.board[newRow][newCol] === player) {
+                    cells.unshift([newRow, newCol]);
+                    newRow -= dRow;
+                    newCol -= dCol;
+                }
+
+                return cells;
+            }
+
+            isValidCell(row, col) {
+                return row >= 0 && row < this.rows && col >= 0 && col < this.cols;
+            }
+
+            checkTie() {
+                for (let row = 0; row < this.rows; row++) {
+                    for (let col = 0; col < this.cols; col++) {
+                        if (this.board[row][col] === null) {
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            }
+
+            newGame() {
+                this.gameOver = false;
+                this.currentPlayer = 'red';
+                this.winningCells = [];
+                this.initializeBoard();
+            }
+        }
+
+        // Run tests
+        const runner = new TestRunner();
+
+        runner.test('Game initializes correctly', () => {
+            const game = new Connect4Game(true);
+            runner.assertEqual(game.rows, 6, 'Should have 6 rows');
+            runner.assertEqual(game.cols, 7, 'Should have 7 columns');
+            runner.assertEqual(game.currentPlayer, 'red', 'Red player should start');
+            runner.assertEqual(game.gameOver, false, 'Game should not be over initially');
+        });
+
+        runner.test('Board initializes empty', () => {
+            const game = new Connect4Game(true);
+            for (let row = 0; row < game.rows; row++) {
+                for (let col = 0; col < game.cols; col++) {
+                    runner.assertEqual(game.board[row][col], null, `Cell [${row}][${col}] should be empty`);
+                }
+            }
+        });
+
+        runner.test('Can drop piece in empty column', () => {
+            const game = new Connect4Game(true);
+            const result = game.dropPiece(0);
+            runner.assertEqual(result, true, 'Should successfully drop piece');
+            runner.assertEqual(game.board[5][0], 'red', 'Piece should be at bottom of column');
+            runner.assertEqual(game.currentPlayer, 'yellow', 'Should switch to yellow player');
+        });
+
+        runner.test('Pieces stack correctly', () => {
+            const game = new Connect4Game(true);
+            game.dropPiece(0); // Red at [5][0]
+            game.dropPiece(0); // Yellow at [4][0]
+            runner.assertEqual(game.board[5][0], 'red', 'First piece should be red at bottom');
+            runner.assertEqual(game.board[4][0], 'yellow', 'Second piece should be yellow above first');
+        });
+
+        runner.test('Cannot drop in full column', () => {
+            const game = new Connect4Game(true);
+            // Fill column 0
+            for (let i = 0; i < 6; i++) {
+                game.dropPiece(0);
+            }
+            const result = game.dropPiece(0);
+            runner.assertEqual(result, false, 'Should not be able to drop in full column');
+        });
+
+        runner.test('Detects horizontal win', () => {
+            const game = new Connect4Game(true);
+            // Create horizontal win for red
+            game.board[5][0] = 'red';
+            game.board[5][1] = 'red';
+            game.board[5][2] = 'red';
+            game.currentPlayer = 'red';
+            
+            const result = game.dropPiece(3);
+            runner.assertEqual(result, 'win', 'Should detect horizontal win');
+            runner.assertEqual(game.gameOver, true, 'Game should be over');
+        });
+
+        runner.test('Detects vertical win', () => {
+            const game = new Connect4Game(true);
+            // Create vertical win for red
+            game.board[5][0] = 'red';
+            game.board[4][0] = 'red';
+            game.board[3][0] = 'red';
+            game.currentPlayer = 'red';
+            
+            const result = game.dropPiece(0);
+            runner.assertEqual(result, 'win', 'Should detect vertical win');
+            runner.assertEqual(game.gameOver, true, 'Game should be over');
+        });
+
+        runner.test('Detects diagonal win', () => {
+            const game = new Connect4Game(true);
+            // Create diagonal win for red - need to set up so the drop creates the win
+            game.board[5][0] = 'red';
+            game.board[4][1] = 'red';
+            game.board[3][2] = 'red';
+            // Set up column 3 so the piece will land at row 2
+            game.board[5][3] = 'yellow';
+            game.board[4][3] = 'yellow';
+            game.board[3][3] = 'yellow';
+            game.currentPlayer = 'red';
+            
+            const result = game.dropPiece(3);
+            runner.assertEqual(result, 'win', 'Should detect diagonal win');
+            runner.assertEqual(game.gameOver, true, 'Game should be over');
+        });
+
+        runner.test('Detects tie game', () => {
+            const game = new Connect4Game(true);
+            // Fill board without creating wins
+            const pattern = ['red', 'yellow', 'red', 'yellow', 'red', 'yellow', 'red'];
+            for (let row = 0; row < game.rows; row++) {
+                for (let col = 0; col < game.cols; col++) {
+                    game.board[row][col] = pattern[col];
+                }
+            }
+            // Make last move
+            game.board[0][6] = null;
+            game.currentPlayer = 'yellow';
+            
+            const result = game.dropPiece(6);
+            runner.assertEqual(result, 'tie', 'Should detect tie game');
+            runner.assertEqual(game.gameOver, true, 'Game should be over');
+        });
+
+        runner.test('New game resets state', () => {
+            const game = new Connect4Game(true);
+            game.dropPiece(0);
+            game.dropPiece(1);
+            game.gameOver = true;
+            
+            game.newGame();
+            
+            runner.assertEqual(game.currentPlayer, 'red', 'Should reset to red player');
+            runner.assertEqual(game.gameOver, false, 'Game should not be over');
+            runner.assertEqual(game.board[5][0], null, 'Board should be empty');
+        });
+
+        // Run all tests
+        document.addEventListener('DOMContentLoaded', () => {
+            runner.run();
+        });
+    </script>
+</body>
+</html>
