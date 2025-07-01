@@ -21,7 +21,7 @@ A browser-based Connect4 game with animations and nice UI.
 
 ## Demo
 
-The game is deployed at: [GitHub Pages URL will be available after deployment]
+The game is deployed at: [Connect4](https://xms-gh-copilot-enterprise-licenses.github.io/Connect4/)
 
 ## Development
 
